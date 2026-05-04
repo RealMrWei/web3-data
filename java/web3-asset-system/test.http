@@ -1,0 +1,214 @@
+### ============================================
+### Web3 链上资产管理系统 - API 接口测试 (含实际测试数据)
+### ============================================
+
+### 基础配置
+@baseUrl = http://localhost:8080/api
+
+### ============================================
+### 1. 核心业务接口测试
+### ============================================
+
+### 查询充值记录列表
+GET http://localhost:8080/api/deposit/list?page=1&size=10
+Accept: application/json
+
+###
+
+### 查询提现订单列表
+GET http://localhost:8080/api/withdrawal/list?page=1&size=10
+Accept: application/json
+
+###
+
+### 查询用户充值历史 (Hardhat 默认账户 #0)
+GET http://localhost:8080/api/deposit/user/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+Accept: application/json
+
+###
+
+### 查询用户提现历史 (Hardhat 默认账户 #0)
+GET http://localhost:8080/api/withdrawal/user/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+Accept: application/json
+
+###
+
+### 充值统计数据
+GET http://localhost:8080/api/deposit/statistics
+Accept: application/json
+
+###
+
+### 提现统计数据
+GET http://localhost:8080/api/withdrawal/statistics
+Accept: application/json
+
+###
+
+### ============================================
+### 2. 事件监听与系统状态
+### ============================================
+
+### 查询事件监听器偏移量
+GET http://localhost:8080/api/event-listener/offsets
+Accept: application/json
+
+###
+
+### 查询监听状态摘要
+GET http://localhost:8080/api/event-listener/status
+Accept: application/json
+
+###
+
+### 健康检查
+GET http://localhost:8080/actuator/health
+Accept: application/json
+
+###
+
+### ============================================
+### 3. 动态链配置管理（第六步）
+### ============================================
+
+### 查询所有链配置
+GET http://localhost:8080/api/chain/list
+Accept: application/json
+
+###
+
+### 查询指定链配置详情
+GET http://localhost:8080/api/chain/detail/localhost
+Accept: application/json
+
+###
+
+### 查询第二个链配置详情
+GET http://localhost:8080/api/chain/detail/localhost2
+Accept: application/json
+
+###
+
+### 添加新链配置（测试用）
+POST http://localhost:8080/api/chain/add
+Content-Type: application/json
+
+{
+  "chainName": "test-chain",
+  "rpcUrl": "http://127.0.0.1:8547",
+  "chainId": 31339,
+  "status": 1
+}
+
+###
+
+### 启用指定链
+PUT http://localhost:8080/api/chain/enable/test-chain
+Accept: application/json
+
+###
+
+### 禁用指定链
+PUT http://localhost:8080/api/chain/disable/test-chain
+Accept: application/json
+
+###
+
+### ============================================
+### 4. 合约地址管理（第六步）
+### ============================================
+
+### 查询所有合约地址
+GET http://localhost:8080/api/contract/list
+Accept: application/json
+
+###
+
+### 查询指定链的所有合约地址
+GET http://localhost:8080/api/contract/list/localhost
+Accept: application/json
+
+###
+
+### 查询第二个链的所有合约地址
+GET http://localhost:8080/api/contract/list/localhost2
+Accept: application/json
+
+###
+
+### 查询指定链的指定类型合约地址
+GET http://localhost:8080/api/contract/address/localhost/deposit_vault
+Accept: application/json
+
+###
+
+### 添加新合约地址
+POST http://localhost:8080/api/contract/add
+Content-Type: application/json
+
+{
+  "chainName": "localhost",
+  "contractType": "test_contract",
+  "contractAddress": "0x0000000000000000000000000000000000000001",
+  "abiVersion": "1.0",
+  "status": 1
+}
+
+###
+
+### 批量添加合约地址
+POST http://localhost:8080/api/contract/batch-add
+Content-Type: application/json
+
+[
+  {
+    "chainName": "localhost2",
+    "contractType": "extra_token_1",
+    "contractAddress": "0x0000000000000000000000000000000000000002",
+    "status": 1
+  },
+  {
+    "chainName": "localhost2",
+    "contractType": "extra_token_2",
+    "contractAddress": "0x0000000000000000000000000000000000000003",
+    "status": 1
+  }
+]
+
+###
+
+### 更新合约地址状态
+PUT http://localhost:8080/api/contract/status
+Content-Type: application/json
+
+{
+  "chainName": "localhost",
+  "contractType": "test_contract",
+  "status": 0
+}
+
+###
+
+### ============================================
+### 5. 交易测试接口 (Hardhat 本地环境)
+### ============================================
+
+### 测试充值（使用配置中的私钥）
+POST http://localhost:8080/api/test/deposit
+Content-Type: application/x-www-form-urlencoded
+
+tokenAddress=0x610178dA211FEF7D417bC0e6FeD39F05609AD788&amount=100
+
+###
+
+### 测试提现（使用配置中的私钥）
+POST http://localhost:8080/api/test/withdrawal
+Content-Type: application/x-www-form-urlencoded
+
+tokenAddress=0x610178dA211FEF7D417bC0e6FeD39F05609AD788&amount=50
+
+###
+
+### ============================================
+### 6. 其他查询示例 (可选)
+### ============================================

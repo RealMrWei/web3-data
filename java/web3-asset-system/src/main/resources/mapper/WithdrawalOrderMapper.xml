@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.web3.mapper.WithdrawalOrderMapper">
+
+    <!--
+        真正的批量 INSERT SQL
+        底层执行：INSERT INTO withdrawal_order (...) VALUES (...), (...), (...)
+        性能：1 次 SQL 插入多条记录
+    -->
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO withdrawal_order (
+            order_no,
+            user_address,
+            recipient,
+            chain_name,
+            token_address,
+            amount,
+            status,
+            tx_hash,
+            create_time,
+            update_time
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+                #{item.orderNo},
+                #{item.userAddress},
+                #{item.recipient},
+                #{item.chainName},
+                #{item.tokenAddress},
+                #{item.amount},
+                #{item.status},
+                #{item.txHash},
+                #{item.createTime},
+                #{item.updateTime}
+            )
+        </foreach>
+    </insert>
+
+</mapper>

@@ -1,0 +1,128 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: web3-asset-system
+
+  # 数据源配置（MySQL）
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/web3_asset?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: web3_user
+    password: web3_password
+
+  # Redis 配置
+  redis:
+    host: localhost
+    port: 6379
+    password: redis123456
+    database: 0
+    timeout: 3000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: -1ms
+        max-idle: 8
+        min-idle: 0
+
+  # Kafka 配置
+  kafka:
+    bootstrap-servers: localhost:29092
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.web3.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# Web3 多链配置
+web3:
+  # 私钥（生产环境应使用 KMS，这里仅用于测试）
+  private-key: ${WEB3_PRIVATE_KEY:0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+
+  # 合约地址配置
+  contracts:
+    # AssetToken 合约地址（ERC20 代币）
+    asset-token: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    # DepositVault 合约地址（充值金库）
+    deposit-vault: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+    # WithdrawalManager 合约地址（提现管理）
+    withdrawal-manager: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+
+  # Gas 配置
+  gas:
+    # Gas 限制
+    gas-limit: 300000
+    # 最大费用（wei）- 50 gwei
+    max-fee-per-gas: 50000000000
+    # 最大优先费（wei）- 1.5 gwei
+    max-priority-fee-per-gas: 1500000000
+
+  # 多链配置
+  chains:
+    # Ethereum 主网/测试网
+    - name: ethereum
+      rpc-url: ${ETH_RPC_URL:https://sepolia.infura.io/v3/2c54a889af8c4415a87b9a7a091b2c13}
+      chain-id: 11155111 # Sepolia 测试网
+      native-currency: ETH
+      enabled: false # 暂时禁用
+
+    # BNB Chain
+    - name: bnb
+      rpc-url: ${BNB_RPC_URL:https://data-seed-prebsc-1-s1.binance.org:8545}
+      chain-id: 97 # BSC Testnet
+      native-currency: BNB
+      enabled: false # 暂时禁用
+
+    # Arbitrum
+    - name: arbitrum
+      rpc-url: ${ARBITRUM_RPC_URL:https://sepolia-rollup.arbitrum.io/rpc}
+      chain-id: 421614 # Arbitrum Sepolia
+      native-currency: ETH
+      enabled: false # 暂时禁用
+
+    # 本地测试网（Hardhat）
+    - name: localhost
+      rpc-url: http://127.0.0.1:8545
+      chain-id: 31337
+      native-currency: ETH
+      enabled: true
+
+  # 定时任务配置（支持注册中心动态配置）
+  scheduled:
+    # 充值事件同步间隔（秒）
+    deposit-sync-interval: 10
+
+    # 提现事件同步间隔（秒）
+    withdrawal-sync-interval: 10
+
+    # 区块高度同步间隔（秒）
+    block-sync-interval: 10
+
+# 日志配置
+logging:
+  level:
+    root: WARN # 控制台只显示警告及以上
+    com.web3: INFO # 业务日志显示 INFO 级别
+    org.web3j: WARN # Web3j 框架日志减少
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/web3-asset.log
+    max-size: 10MB
+    max-history: 30
+
+# ShedLock 分布式锁配置（集群部署必需）
+shedlock:
+  enabled: true
+  lock-at-most-for: 10m
+  lock-at-least-for: 1s
