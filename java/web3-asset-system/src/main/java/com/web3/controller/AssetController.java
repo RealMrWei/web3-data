@@ -10,6 +10,8 @@ import com.web3.mapper.WithdrawalOrderMapper;
 import com.web3.service.AssetManagementService;
 import com.web3.service.DepositService;
 import com.web3.service.WithdrawalService;
+import com.web3.utils.Web3ContractClient;
+
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -136,58 +138,6 @@ public class AssetController {
     }
 
     /**
-     * 申请提现
-     */
-    @PostMapping("/withdrawals")
-    public Map<String, Object> requestWithdrawal(@RequestBody WithdrawalRequest request) {
-        try {
-            String requestId;
-            if (request.getTokenAddress() == null || request.getTokenAddress().isEmpty()) {
-                // 原生币提现
-                requestId = assetManagementService.requestNativeWithdrawal(
-                        request.getChainName(),
-                        request.getUserAddress(),
-                        new BigInteger(request.getAmount()));
-            } else {
-                // ERC20提现
-                requestId = assetManagementService.requestERC20Withdrawal(
-                        request.getChainName(),
-                        request.getTokenAddress(),
-                        request.getUserAddress(),
-                        new BigInteger(request.getAmount()));
-            }
-
-            // 创建提现订单记录
-            WithdrawalOrder order = new WithdrawalOrder();
-            order.setChainName(request.getChainName());
-            order.setUserAddress(request.getUserAddress());
-            order.setRecipient(request.getRecipient());
-            order.setAmount(new java.math.BigDecimal(request.getAmount()));
-            order.setTokenAddress(request.getTokenAddress());
-            order.setStatus(0); // 0-待审核
-            order.setCreateTime(LocalDateTime.now());
-            order.setUpdateTime(LocalDateTime.now());
-
-            withdrawalOrderMapper.insert(order);
-
-            Map<String, Object> result = new HashMap<>();
-            result.put("code", 200);
-            result.put("message", "提现申请成功");
-            result.put("requestId", requestId);
-            result.put("orderId", order.getId());
-
-            return result;
-
-        } catch (Exception e) {
-            log.error("提现申请失败", e);
-            Map<String, Object> result = new HashMap<>();
-            result.put("code", 500);
-            result.put("message", "提现申请失败: " + e.getMessage());
-            return result;
-        }
-    }
-
-    /**
      * 查询充值记录
      */
     @GetMapping("/deposits")
@@ -247,6 +197,30 @@ public class AssetController {
         result.put("total", resultPage.getTotal());
 
         return result;
+    }
+
+    @PostMapping("/deposit/erc20with-client")
+    public Map<String, Object> depositWithClient(@RequestBody ERC20DepositRequest request) {
+        try {
+            String txHash = assetManagementService.depositWithClient(
+                    request.getChainName(),
+                    request.getTokenAddress(),
+                    request.getFromAddress(),
+                    request.getPrivateKey(),
+                    new BigInteger(request.getAmount()));
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 200);
+            result.put("message", "充值成功");
+            result.put("txHash", txHash);
+            return result;
+        } catch (Exception e) {
+            log.error("ERC20充值失败", e);
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", 500);
+            result.put("message", "充值失败: " + e.getMessage());
+            return result;
+        }
     }
 
     // ==================== DTO Classes ====================

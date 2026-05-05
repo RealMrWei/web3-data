@@ -319,257 +319,242 @@ curl "http://localhost:8080/api/withdrawal/statistics?chainName=ethereum"
 
 ---
 
-## 👂 事件监听数据查询（EventListenerController）
+### 5. 用户申请提现（Request Withdrawal）
 
-### 1. 查询所有链的监听偏移量
+**接口**: `POST /api/withdrawal/requestWithdrawal`
 
-**接口**: `GET /api/event-listener/offsets`
+**请求参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| chainName | string | 是 | 链名称（localhost/ethereum/bnb等） |
+| userAddress | string | 是 | 用户私钥（用于签名交易） |
+| tokenAddress | string | 是 | 代币合约地址 |
+| amount | BigInteger | 是 | 提现金额（wei单位） |
 
 **响应示例**:
-```json
+``json
 {
   "code": 200,
   "message": "success",
-  "data": [
-    {
-      "id": 1,
-      "chainName": "ethereum",
-      "lastProcessedBlock": 12345,
-      "isSynced": true,
-      "version": 100,
-      "updateTime": "2024-01-01T12:00:00"
-    },
-    {
-      "id": 2,
-      "chainName": "bnb",
-      "lastProcessedBlock": 23456,
-      "isSynced": true,
-      "version": 80,
-      "updateTime": "2024-01-01T12:00:00"
-    }
-  ]
+  "data": "0xabc123..." // 交易哈希
 }
 ```
 
 **调用示例**:
-```bash
-curl "http://localhost:8080/api/event-listener/offsets"
+``bash
+curl -X POST "http://localhost:8080/api/withdrawal/requestWithdrawal" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "chainName=localhost&userAddress=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&amount=1000000000000000000"
 ```
 
 ---
 
-### 2. 根据链名称查询监听状态
+### 6. 管理员审批提现（Approve Withdrawal）
 
-**接口**: `GET /api/event-listener/offset/{chainName}`
+**接口**: `POST /api/withdrawal/approveWithdrawal`
 
-**路径参数**:
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| chainName | string | 链名称 |
+**请求参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| chainName | string | 是 | 链名称 |
+| adminKey | string | 是 | 管理员私钥 |
+| withdrawalId | BigInteger | 是 | 提现记录ID |
 
 **响应示例**:
-```json
+``json
+{
+  "code": 200,
+  "message": "success",
+  "data": "0xdef456..." // 交易哈希
+}
+```
+
+**调用示例**:
+``bash
+curl -X POST "http://localhost:8080/api/withdrawal/approveWithdrawal" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "chainName=localhost&adminKey=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&withdrawalId=1"
+```
+
+---
+
+### 7. 获取下一个提现ID（Get Next Withdrawal ID）
+
+**接口**: `GET /api/withdrawal/nextWithdrawalId`
+
+**请求参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| chainName | string | 是 | 链名称 |
+
+**响应示例**:
+``json
+{
+  "code": 200,
+  "message": "success",
+  "data": 5 // 下一个可用的提现ID
+}
+```
+
+**调用示例**:
+``bash
+curl "http://localhost:8080/api/withdrawal/nextWithdrawalId?chainName=localhost"
+```
+
+---
+
+### 8. 查询提现记录详情（Get Withdrawal Record）
+
+**接口**: `GET /api/withdrawal/withdrawalRecord`
+
+**请求参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| chainName | string | 是 | 链名称 |
+| withdrawalId | BigInteger | 是 | 提现记录ID |
+
+**响应示例**:
+``json
 {
   "code": 200,
   "message": "success",
   "data": {
-    "id": 1,
-    "chainName": "ethereum",
-    "lastProcessedBlock": 12345,
-    "isSynced": true,
-    "version": 100,
-    "updateTime": "2024-01-01T12:00:00"
+    "withdrawalId": 1,
+    "status": 1, // 0-待审批 1-已批准 2-已完成 3-失败
+    "user": "0x123...",
+    "amount": "1000000000000000000",
+    "token": "0x456..."
   }
 }
 ```
 
 **调用示例**:
-```bash
-curl "http://localhost:8080/api/event-listener/offset/ethereum"
+``bash
+curl "http://localhost:8080/api/withdrawal/withdrawalRecord?chainName=localhost&withdrawalId=1"
 ```
 
 ---
 
-### 3. 获取监听状态摘要（简化版）
+### 9. 执行直接提现（Execute Withdrawal）
 
-**接口**: `GET /api/event-listener/status`
+**接口**: `POST /api/withdrawal/withdraw`
+
+**请求参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| chainName | string | 是 | 链名称 |
+| userAddress | string | 是 | 用户地址 |
+| privateKey | string | 是 | 用户私钥 |
+| amount | BigInteger | 是 | 提现金额 |
+| tokenAddress | string | 是 | 代币合约地址 |
 
 **响应示例**:
-```json
+``json
 {
   "code": 200,
   "message": "success",
-  "data": [
-    {
-      "chainName": "ethereum",
-      "lastProcessedBlock": 12345,
-      "isSynced": true,
-      "updateTime": "2024-01-01T12:00:00"
-    },
-    {
-      "chainName": "bnb",
-      "lastProcessedBlock": 23456,
-      "isSynced": true,
-      "updateTime": "2024-01-01T12:00:00"
-    }
-  ]
+  "data": "0xghi789..." // 交易哈希
+}
+```
+
+**调用示例**:
+``bash
+curl -X POST "http://localhost:8080/api/withdrawal/withdraw" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "chainName=localhost&userAddress=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266&privateKey=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&amount=500000000000000000&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+```
+
+---
+
+## 🔐 ERC20 授权管理接口
+
+### 1. 查询授权额度（Allowance）
+
+**接口**: `GET /api/withdrawal/allowance`
+
+**请求参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| chainName | string | 是 | 链名称 |
+| userAddress | string | 是 | 用户地址（owner） |
+| tokenAddress | string | 是 | 代币合约地址 |
+| withdrawContract | string | 是 | 提现合约地址（spender） |
+
+**响应示例**:
+``json
+{
+  "code": 200,
+  "message": "success",
+  "data": 1000000000000000000 // 授权额度（wei单位）
 }
 ```
 
 **调用示例**:
 ```bash
-curl "http://localhost:8080/api/event-listener/status"
+curl "http://localhost:8080/api/withdrawal/allowance?chainName=localhost&userAddress=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&withdrawContract=0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
 ```
 
 ---
 
-## ⚠️ 异常处理
+### 2. 模拟用户授权（Approve）
 
-### 统一错误响应格式
+**接口**: `POST /api/withdrawal/approve`
 
-```json
+**请求参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| chainName | string | 是 | 链名称 |
+| tokenAddress | string | 是 | 代币合约地址 |
+| privateKey | string | 是 | 用户私钥 |
+| amount | BigInteger | 是 | 授权金额 |
+
+**响应示例**:
+``json
 {
-  "code": 400,
-  "message": "参数校验失败",
-  "errors": {
-    "field1": "错误信息1",
-    "field2": "错误信息2"
-  }
+  "code": 200,
+  "message": "success",
+  "data": "0xjkl012..." // 交易哈希
 }
 ```
 
-### 常见错误码
-
-| 错误码 | 说明 |
-|--------|------|
-| 200 | 成功 |
-| 400 | 参数错误 |
-| 404 | 资源不存在 |
-| 500 | 服务器内部错误 |
-
----
-
-## 🧪 测试用例
-
-### 1. 测试充值记录查询
-```bash
-# 查询所有充值记录
-curl "http://localhost:8080/api/deposit/list?page=1&size=5"
-
-# 查询以太坊链的成功充值
-curl "http://localhost:8080/api/deposit/list?chainName=ethereum&status=1"
-
-# 查询特定交易
-curl "http://localhost:8080/api/deposit/tx/0xabc123..."
-
-# 查询用户充值历史
-curl "http://localhost:8080/api/deposit/user/0x123...?page=1&size=10"
-
-# 统计充值数据
-curl "http://localhost:8080/api/deposit/statistics"
+**调用示例**:
+``bash
+curl -X POST "http://localhost:8080/api/withdrawal/approve" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "chainName=localhost&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&privateKey=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&amount=1000000000000000000"
 ```
 
 ---
 
-### 2. 测试提现订单查询
-```bash
-# 查询所有提现订单
-curl "http://localhost:8080/api/withdrawal/list?page=1&size=5"
+## 🧪 测试专用接口
 
-# 查询已完成的提现
-curl "http://localhost:8080/api/withdrawal/list?status=2"
+### 1. 直接给提现合约打款（Test Direct Withdraw）
 
-# 查询特定订单
-curl "http://localhost:8080/api/withdrawal/order/WD20240101120000"
+**接口**: `POST /api/test/directWithdraw`
 
-# 查询用户提现历史
-curl "http://localhost:8080/api/withdrawal/user/0x123...?page=1&size=10"
+**请求参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| tokenAddress | string | 是 | 代币合约地址 |
+| amount | BigDecimal | 是 | 提现金额（十进制数值） |
 
-# 统计提现数据
-curl "http://localhost:8080/api/withdrawal/statistics"
-```
-
----
-
-### 3. 测试事件监听状态
-```bash
-# 查询所有链的监听状态
-curl "http://localhost:8080/api/event-listener/offsets"
-
-# 查询以太坊链的监听状态
-curl "http://localhost:8080/api/event-listener/offset/ethereum"
-
-# 获取简化状态摘要
-curl "http://localhost:8080/api/event-listener/status"
-```
-
----
-
-## 📊 前端集成示例
-
-### Vue.js 示例
-```javascript
-// 查询充值记录
-async function getDeposits(page = 1, size = 10) {
-  const response = await fetch(`/api/deposit/list?page=${page}&size=${size}`);
-  const result = await response.json();
-  
-  if (result.code === 200) {
-    return {
-      list: result.data,
-      total: result.total,
-      pages: result.pages
-    };
-  } else {
-    throw new Error(result.message);
-  }
-}
-
-// 统计充值数据
-async function getDepositStatistics() {
-  const response = await fetch('/api/deposit/statistics');
-  const result = await response.json();
-  
-  if (result.code === 200) {
-    return result.data;
-  } else {
-    throw new Error(result.message);
-  }
+**响应示例**:
+``json
+{
+  "code": 200,
+  "message": "直接提现交易已发送",
+  "txHash": "0xmno345..."
 }
 ```
 
----
-
-### React 示例
-```javascript
-// 查询提现订单
-async function getWithdrawals(page = 1, size = 10) {
-  const response = await fetch(`/api/withdrawal/list?page=${page}&size=${size}`);
-  const result = await response.json();
-  
-  if (result.code === 200) {
-    return {
-      list: result.data,
-      total: result.total,
-      pages: result.pages
-    };
-  } else {
-    throw new Error(result.message);
-  }
-}
-
-// 查询监听状态
-async function getListenerStatus() {
-  const response = await fetch('/api/event-listener/status');
-  const result = await response.json();
-  
-  if (result.code === 200) {
-    return result.data;
-  } else {
-    throw new Error(result.message);
-  }
-}
+**调用示例**:
+``bash
+curl -X POST "http://localhost:8080/api/test/directWithdraw" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&amount=100.5"
 ```
+
+**注意**: 此接口仅用于测试环境，生产环境应禁用。
 
 ---
 
@@ -578,9 +563,10 @@ async function getListenerStatus() {
 | 模块 | 接口数量 | 功能 |
 |------|---------|------|
 | **充值** | 4 | 列表查询、单笔查询、用户历史、统计 |
-| **提现** | 4 | 列表查询、单笔查询、用户历史、统计 |
+| **提现** | 13 | 列表查询、单笔查询、用户历史、统计、申请、审批、执行、授权管理等 |
 | **事件监听** | 3 | 全部偏移量、单链状态、状态摘要 |
-| **总计** | **11** | - |
+| **测试接口** | 1 | 直接提现测试 |
+| **总计** | **21** | - |
 
 ---
 

@@ -4,11 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.web3.entity.WithdrawalOrder;
 import com.web3.mapper.WithdrawalOrderMapper;
+import com.web3.service.WithdrawalService;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,17 +28,20 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/withdrawal")
 public class WithdrawalController {
-    
+
     @Autowired
     private WithdrawalOrderMapper withdrawalOrderMapper;
-    
+
+    @Autowired
+    private WithdrawalService withdrawalService; // 注入提现服务
+
     /**
      * 查询提现订单列表（分页）
      * 
-     * @param page 页码（从1开始）
-     * @param size 每页大小
+     * @param page      页码（从1开始）
+     * @param size      每页大小
      * @param chainName 链名称（可选）
-     * @param status 状态（可选）
+     * @param status    状态（可选）
      * @return 分页结果
      */
     @GetMapping("/list")
@@ -44,27 +50,27 @@ public class WithdrawalController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String chainName,
             @RequestParam(required = false) Integer status) {
-        
+
         log.info("查询提现订单列表: page={}, size={}, chainName={}, status={}", page, size, chainName, status);
-        
+
         // 构建查询条件
         LambdaQueryWrapper<WithdrawalOrder> wrapper = new LambdaQueryWrapper<>();
-        
+
         if (chainName != null && !chainName.isEmpty()) {
             wrapper.eq(WithdrawalOrder::getChainName, chainName);
         }
-        
+
         if (status != null) {
             wrapper.eq(WithdrawalOrder::getStatus, status);
         }
-        
+
         // 按创建时间倒序
         wrapper.orderByDesc(WithdrawalOrder::getCreateTime);
-        
+
         // 分页查询
         Page<WithdrawalOrder> pageParam = new Page<>(page, size);
         Page<WithdrawalOrder> result = withdrawalOrderMapper.selectPage(pageParam, wrapper);
-        
+
         // 构建返回结果
         Map<String, Object> response = new HashMap<>();
         response.put("code", 200);
@@ -74,10 +80,10 @@ public class WithdrawalController {
         response.put("current", result.getCurrent());
         response.put("size", result.getSize());
         response.put("pages", result.getPages());
-        
+
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * 根据订单号查询单笔提现订单
      * 
@@ -87,12 +93,12 @@ public class WithdrawalController {
     @GetMapping("/order/{orderNo}")
     public ResponseEntity<Map<String, Object>> getWithdrawalByOrderNo(@PathVariable String orderNo) {
         log.info("查询提现订单: orderNo={}", orderNo);
-        
+
         LambdaQueryWrapper<WithdrawalOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(WithdrawalOrder::getOrderNo, orderNo);
-        
+
         WithdrawalOrder order = withdrawalOrderMapper.selectOne(wrapper);
-        
+
         Map<String, Object> response = new HashMap<>();
         if (order != null) {
             response.put("code", 200);
@@ -102,16 +108,16 @@ public class WithdrawalController {
             response.put("code", 404);
             response.put("message", "提现订单不存在");
         }
-        
+
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * 根据用户地址查询提现历史
      * 
      * @param userAddress 用户钱包地址
-     * @param page 页码
-     * @param size 每页大小
+     * @param page        页码
+     * @param size        每页大小
      * @return 提现历史列表
      */
     @GetMapping("/user/{userAddress}")
@@ -119,16 +125,16 @@ public class WithdrawalController {
             @PathVariable String userAddress,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        
+
         log.info("查询用户提现历史: userAddress={}, page={}, size={}", userAddress, page, size);
-        
+
         LambdaQueryWrapper<WithdrawalOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(WithdrawalOrder::getUserAddress, userAddress);
         wrapper.orderByDesc(WithdrawalOrder::getCreateTime);
-        
+
         Page<WithdrawalOrder> pageParam = new Page<>(page, size);
         Page<WithdrawalOrder> result = withdrawalOrderMapper.selectPage(pageParam, wrapper);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("code", 200);
         response.put("message", "success");
@@ -137,10 +143,10 @@ public class WithdrawalController {
         response.put("current", result.getCurrent());
         response.put("size", result.getSize());
         response.put("pages", result.getPages());
-        
+
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * 统计提现数据
      * 
@@ -150,18 +156,18 @@ public class WithdrawalController {
     @GetMapping("/statistics")
     public ResponseEntity<Map<String, Object>> getWithdrawalStatistics(
             @RequestParam(required = false) String chainName) {
-        
+
         log.info("统计提现数据: chainName={}", chainName);
-        
+
         LambdaQueryWrapper<WithdrawalOrder> wrapper = new LambdaQueryWrapper<>();
-        
+
         if (chainName != null && !chainName.isEmpty()) {
             wrapper.eq(WithdrawalOrder::getChainName, chainName);
         }
-        
+
         // 总提现笔数
         Long totalCount = withdrawalOrderMapper.selectCount(wrapper);
-        
+
         // 已完成提现笔数
         LambdaQueryWrapper<WithdrawalOrder> completedWrapper = new LambdaQueryWrapper<>();
         completedWrapper.eq(WithdrawalOrder::getStatus, 2);
@@ -169,7 +175,7 @@ public class WithdrawalController {
             completedWrapper.eq(WithdrawalOrder::getChainName, chainName);
         }
         Long completedCount = withdrawalOrderMapper.selectCount(completedWrapper);
-        
+
         // 待审批提现笔数
         LambdaQueryWrapper<WithdrawalOrder> pendingWrapper = new LambdaQueryWrapper<>();
         pendingWrapper.eq(WithdrawalOrder::getStatus, 0);
@@ -177,19 +183,65 @@ public class WithdrawalController {
             pendingWrapper.eq(WithdrawalOrder::getChainName, chainName);
         }
         Long pendingCount = withdrawalOrderMapper.selectCount(pendingWrapper);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("code", 200);
         response.put("message", "success");
-        
+
         Map<String, Object> statistics = new HashMap<>();
         statistics.put("totalCount", totalCount);
         statistics.put("completedCount", completedCount);
         statistics.put("pendingCount", pendingCount);
         statistics.put("failedCount", totalCount - completedCount - pendingCount);
-        
+
         response.put("data", statistics);
-        
+
         return ResponseEntity.ok(response);
     }
+
+    // 实现提现的方法
+    @PostMapping("/withdraw")
+    public String withdraw(String chainName, String adminPrivateKey, BigInteger withdrawalId,
+            String tokenAddress) {
+        return withdrawalService.executeWithdrawal(chainName, adminPrivateKey, withdrawalId);
+    }
+
+    // 实现模拟授权方法
+    @PostMapping("/approve")
+    public String approve(String chainName, String tokenAddress, String privateKey, BigInteger amount) {
+        return withdrawalService.testApprove(chainName, tokenAddress, privateKey, amount);
+    }
+
+    // 获取查询授权额度
+    @GetMapping("/allowance")
+    public BigInteger getAllowance(String chainName, String userAddress, String tokenAddress, String withdrawContract) {
+        return withdrawalService.getAllowance(chainName, tokenAddress, userAddress, withdrawContract);
+    }
+
+    // 用户申请提现
+    @PostMapping("/requestWithdrawal")
+    public String requestWithdrawal(String chainName, String userAddress, String tokenAddress, BigInteger amount) {
+        return withdrawalService.requestWithdrawal(chainName, userAddress, tokenAddress, amount);
+    }
+
+    // 管理员同意提现
+    @PostMapping("/approveWithdrawal")
+    public String approveWithdrawal(String chainName,
+            String adminKey,
+            BigInteger withdrawalId) {
+        return withdrawalService.approveWithdrawal(chainName, adminKey, withdrawalId);
+    }
+
+    // 查询：下一个提现ID（也就是最新申请的ID）
+    @GetMapping("/nextWithdrawalId")
+    public BigInteger getNextWithdrawalId(String chainName) {
+        return withdrawalService.getNextWithdrawalId(chainName);
+    }
+
+    // 查询提现记录：状态、用户、金额、token
+    @GetMapping("/withdrawalRecord")
+    public Map<String, Object> getWithdrawalRecord(String chainName, BigInteger withdrawalId) {
+        return withdrawalService.getWithdrawalRecord(chainName, withdrawalId);
+    }
+
 }

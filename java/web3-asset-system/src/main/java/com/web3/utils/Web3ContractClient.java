@@ -115,6 +115,21 @@ public class Web3ContractClient {
     }
 
     // ========================= 交易发送（不绑定工具类私钥） =========================
+    /**
+     * 带重试机制的异步交易发送方法（不绑定工具类私钥）
+     * <p>
+     * 该方法使用本地缓存Nonce解决并发冲突，支持指数退避重试和RPC节点故障切换。
+     * 交易流程包括：获取Nonce、估算Gas、构造交易、签名、发送、等待回执。
+     * </p>
+     *
+     * @param chainName   区块链网络名称，用于选择对应的Web3j客户端和RPC端点
+     * @param credentials 交易发起方的凭证信息，包含私钥用于交易签名
+     * @param toAddress   交易接收方地址，可以是合约地址或普通账户地址
+     * @param data        交易数据，调用合约方法时的编码数据，普通转账可为空字符串
+     * @param value       交易金额（以Wei为单位），普通转账时指定，合约调用通常为0
+     * @return CompletableFuture<TransactionReceipt> 异步返回的交易回执，包含交易状态、Gas消耗等信息
+     * @throws RuntimeException 当重试次数耗尽或遇到不可恢复错误时抛出异常
+     */
     public CompletableFuture<TransactionReceipt> sendTransactionWithRetry(
             String chainName, Credentials credentials,
             String toAddress, String data, BigInteger value) {
@@ -124,43 +139,53 @@ public class Web3ContractClient {
             Exception lastEx = null;
             Web3j web3j = getWeb3j(chainName);
 
+            // 重试循环，最多执行maxRetries+1次尝试
             while (attempt <= maxRetries) {
                 try {
-                    // 本地缓存Nonce，解决并发冲突
+                    // 获取本地缓存的Nonce以避免并发冲突
                     BigInteger nonce = getLocalNonce(chainName, credentials.getAddress());
-                    // 估算Gas
+                    
+                    // 估算最优Gas价格和限制
                     GasEstimation gasEst = estimateOptimalGas(web3j, toAddress, data, value);
-                    // 构造交易
+                    
+                    // 构造原始交易对象
                     RawTransaction rawTx = RawTransaction.createTransaction(
                             nonce, gasEst.gasPrice, gasEst.gasLimit,
                             toAddress, value, data);
-                    // 签名发送
+                    
+                    // 使用凭证对交易进行签名并转换为十六进制字符串
                     byte[] signed = TransactionEncoder.signMessage(rawTx, credentials);
                     String hexTx = Numeric.toHexString(signed);
 
+                    // 异步发送原始交易并等待结果
                     EthSendTransaction sendTx = web3j.ethSendRawTransaction(hexTx)
                             .sendAsync()
                             .get(timeoutMs, TimeUnit.MILLISECONDS);
 
+                    // 检查交易下发是否成功
                     if (sendTx.hasError()) {
                         throw new RuntimeException("交易下发失败:" + sendTx.getError().getMessage());
                     }
+                    
                     String txHash = sendTx.getTransactionHash();
                     log.info("交易已下发 chain={} hash={} nonce={}", chainName, txHash, nonce);
 
-                    // 自增本地Nonce
+                    // 自增本地Nonce计数器，为下一笔交易做准备
                     incrementLocalNonce(chainName, credentials.getAddress());
-                    // 异步等待回执
+                    
+                    // 等待并返回交易回执
                     return waitForTransactionReceipt(web3j, txHash);
 
                 } catch (Exception e) {
                     lastEx = e;
                     attempt++;
-                    // RPC异常触发切换节点
+                    
+                    // 检测到RPC错误时切换到备用节点
                     if (isRpcError(e)) {
                         web3j = fallbackRpc(chainName);
                     }
-                    // 指数退避重试
+                    
+                    // 判断是否需要重试并执行指数退避策略
                     if (attempt <= maxRetries && shouldRetry(e)) {
                         long delay = baseDelayMs * (1L << (attempt - 1));
                         log.warn("交易失败，{}ms后重试 第{}/{} err:{}",
@@ -176,6 +201,8 @@ public class Web3ContractClient {
                     }
                 }
             }
+            
+            // 所有重试尝试均失败，记录错误并抛出异常
             log.error("交易重试耗尽仍失败", lastEx);
             throw new RuntimeException("交易发送失败:" + lastEx.getMessage(), lastEx);
         }, Async.defaultExecutorService());

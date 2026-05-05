@@ -260,16 +260,302 @@ cd ../java/web3-asset-system
 - 检查 [application.yml](file:///d:/study/web3-data/java/web3-asset-system/src/main/resources/application.yml) 中的数据库连接配置
 - 验证数据库用户名密码是否正确
 
-## 10. 集群部署注意事项
+## 10. REST API 接口测试
 
-### 10.1 分布式锁配置
+### 10.1 使用 test.http 文件测试
+
+**前提条件**:
+- VS Code 已安装 "REST Client" 插件
+- Java 应用已启动（`mvn spring-boot:run`）
+- 合约已部署且地址已配置
+
+**测试步骤**:
+
+1. **打开测试文件**
+   ```bash
+   # 在 VS Code 中打开
+   code java/web3-asset-system/test.http
+   ```
+
+2. **充值功能测试**
+   - 找到 "充值相关接口" 部分
+   - 点击每个请求上方的 "Send Request" 按钮
+   - 验证返回结果符合预期
+
+3. **提现功能测试**（完整流程）
+   
+   **步骤 1: 授权代币给提现合约**
+   ```http
+   POST http://localhost:8080/api/withdrawal/approve
+   Content-Type: application/x-www-form-urlencoded
+   
+   chainName=localhost&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&privateKey=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&amount=1000000000000000000
+   ```
+   
+   **步骤 2: 查询授权额度**
+   ```http
+   GET http://localhost:8080/api/withdrawal/allowance?chainName=localhost&userAddress=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&withdrawContract=0x5FC8d32690cc91D4c39d9d3abcBD16989F875707
+   ```
+   
+   **步骤 3: 用户申请提现**
+   ```http
+   POST http://localhost:8080/api/withdrawal/requestWithdrawal
+   Content-Type: application/x-www-form-urlencoded
+   
+   chainName=localhost&userAddress=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&amount=1000000000000000000
+   ```
+   
+   **步骤 4: 获取提现ID**
+   ```http
+   GET http://localhost:8080/api/withdrawal/nextWithdrawalId?chainName=localhost
+   ```
+   
+   **步骤 5: 查询提现记录**
+   ```http
+   GET http://localhost:8080/api/withdrawal/withdrawalRecord?chainName=localhost&withdrawalId=1
+   ```
+   
+   **步骤 6: 管理员审批提现**
+   ```http
+   POST http://localhost:8080/api/withdrawal/approveWithdrawal
+   Content-Type: application/x-www-form-urlencoded
+   
+   chainName=localhost&adminKey=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&withdrawalId=1
+   ```
+   
+   **步骤 7: 执行提现**
+   ```http
+   POST http://localhost:8080/api/withdrawal/withdraw
+   Content-Type: application/x-www-form-urlencoded
+   
+   chainName=localhost&userAddress=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266&privateKey=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&amount=500000000000000000&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+   ```
+
+4. **事件监听查询**
+   - 测试 `/api/event-listener/offsets` 查看各链同步状态
+   - 验证 `lastProcessedBlock` 持续更新
+
+### 10.2 使用 curl 命令测试
+
+```bash
+# 查询充值列表
+curl "http://localhost:8080/api/deposit/list?page=1&size=10"
+
+# 查询提现列表
+curl "http://localhost:8080/api/withdrawal/list?page=1&size=10"
+
+# 查询用户资产
+curl "http://localhost:8080/api/assets/user/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+# 查询监听状态
+curl "http://localhost:8080/api/event-listener/status"
+```
+
+### 10.3 验证测试结果
+
+**检查点**:
+- ✅ HTTP 状态码为 200
+- ✅ 返回 JSON 格式正确，包含 `code`, `message`, `data` 字段
+- ✅ 数据库中对应表有新记录插入
+- ✅ 应用日志无 ERROR 级别错误
+- ✅ Kafka 消息正常消费
+
+---
+
+## 11. 完整业务流程验证
+
+### 11.1 充值流程端到端测试
+
+```
+1. 用户调用 DepositVault.deposit() 
+   ↓
+2. 触发 Deposit 事件（链上）
+   ↓
+3. DepositEventListener 捕获事件
+   ↓
+4. 发送消息到 Kafka topic: deposit-events
+   ↓
+5. DepositEventConsumer 消费消息
+   ↓
+6. 插入 deposit_record 表
+   ↓
+7. 更新 user_asset 表余额
+   ↓
+8. API 查询返回最新数据
+```
+
+**验证方法**:
+```bash
+# 1. 执行充值脚本
+cd hardhat
+npx hardhat run scripts/diagnose-deposit.js --network localhost
+
+# 2. 查看 Java 应用日志
+tail -f logs/web3-asset.log | grep "Deposit"
+
+# 3. 查询数据库
+mysql -u web3_user -pweb3_password web3_asset -e "SELECT * FROM deposit_record ORDER BY id DESC LIMIT 1;"
+mysql -u web3_user -pweb3_password web3_asset -e "SELECT * FROM user_asset WHERE user_address='0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';"
+
+# 4. 调用 API 验证
+curl "http://localhost:8080/api/deposit/user/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?page=1&size=5"
+```
+
+### 11.2 提现流程端到端测试
+
+```
+1. 用户调用 AssetToken.approve(withdrawalManager, amount)
+   ↓
+2. 用户调用 WithdrawalManager.requestWithdrawal(token, amount)
+   ↓
+3. 触发 WithdrawalRequested 事件（链上）
+   ↓
+4. WithdrawalEventListener 捕获事件
+   ↓
+5. 发送消息到 Kafka topic: withdrawal-events
+   ↓
+6. WithdrawalEventConsumer 消费消息
+   ↓
+7. 插入 withdrawal_order 表（status=0 待审批）
+   ↓
+8. 管理员调用 WithdrawalManager.approveWithdrawal(id)
+   ↓
+9. 管理员调用 WithdrawalManager.executeWithdrawal(token, recipient, amount)
+   ↓
+10. 触发 WithdrawalExecuted 事件
+    ↓
+11. 更新 withdrawal_order 表（status=2 已完成）
+    ↓
+12. 更新 user_asset 表余额
+```
+
+**验证方法**:
+```bash
+# 1. 执行完整提现流程脚本
+cd hardhat
+npx hardhat run scripts/test-withdrawal.js --network localhost
+npx hardhat run scripts/approve-and-execute-withdrawal.js --network localhost
+
+# 2. 查看 Java 应用日志
+tail -f logs/web3-asset.log | grep "Withdrawal"
+
+# 3. 查询数据库
+mysql -u web3_user -pweb3_password web3_asset -e "SELECT * FROM withdrawal_order ORDER BY id DESC LIMIT 1;"
+mysql -u web3_user -pweb3_password web3_asset -e "SELECT * FROM user_asset WHERE user_address='0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';"
+
+# 4. 调用 API 验证
+curl "http://localhost:8080/api/withdrawal/user/0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266?page=1&size=5"
+```
+
+---
+
+## 12. 性能与压力测试（可选）
+
+### 12.1 批量充值测试
+
+```bash
+# 创建批量充值脚本
+cat > hardhat/scripts/batch-deposit-test.js << 'EOF'
+const { ethers } = require("hardhat");
+
+async function main() {
+  const [deployer] = await ethers.getSigners();
+  const depositVault = await ethers.getContractAt("DepositVault", "YOUR_DEPOSIT_VAULT_ADDRESS");
+  const assetToken = await ethers.getContractAt("AssetToken", "YOUR_ASSET_TOKEN_ADDRESS");
+  
+  const amount = ethers.utils.parseUnits("10", 18); // 10 tokens
+  
+  console.log("开始批量充值测试...");
+  
+  for (let i = 0; i < 10; i++) {
+    await assetToken.approve(depositVault.address, amount);
+    const tx = await depositVault.deploy(assetToken.address, amount);
+    await tx.wait();
+    console.log(`第 ${i + 1} 笔充值完成: ${tx.hash}`);
+  }
+  
+  console.log("批量充值测试完成！");
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
+EOF
+
+# 执行批量测试
+npx hardhat run scripts/batch-deposit-test.js --network localhost
+```
+
+### 12.2 监控指标
+
+- **Kafka 消费延迟**: 检查消费者 lag
+- **数据库连接池**: 监控活跃连接数
+- **Redis 命中率**: 检查去重缓存效果
+- **API 响应时间**: 使用 Postman Collection Runner 或 JMeter
+
+---
+
+## 13. 故障恢复测试
+
+### 13.1 模拟服务重启
+
+```bash
+# 1. 停止 Java 应用
+# Ctrl+C 终止 mvn spring-boot:run
+
+# 2. 执行一些充值/提现操作（这些操作会暂时无法被处理）
+
+# 3. 重新启动应用
+mvn spring-boot:run
+
+# 4. 验证断点续传
+# - 检查日志中是否从上次中断的区块继续同步
+# - 验证遗漏的事件是否被补全处理
+```
+
+### 13.2 模拟 Kafka 中断
+
+```bash
+# 1. 停止 Kafka 容器
+docker-compose stop kafka
+
+# 2. 执行充值操作（事件监听器应能正常捕获，但发送到 Kafka 会失败）
+
+# 3. 重启 Kafka
+docker-compose start kafka
+
+# 4. 验证消息是否重新发送并成功消费
+```
+
+---
+
+## 14. 集群部署注意事项
+
+### 14.1 分布式锁配置
 - 确保所有节点共享同一个 Redis 实例
 - 验证 ShedLock 配置正确，防止多个节点重复处理事件
 
-### 10.2 Kafka 消费者组
+### 14.2 Kafka 消费者组
 - 确保所有节点使用相同的消费者组名称
 - 验证手动提交偏移量配置正确
 
-### 10.3 数据库连接池
+### 14.3 数据库连接池
 - 调整连接池大小以适应集群规模
 - 验证数据库最大连接数设置足够支持所有节点
+
+---
+
+**测试完成检查清单**:
+- [ ] 所有智能合约已部署且地址配置正确
+- [ ] 充值流程端到端测试通过
+- [ ] 提现流程端到端测试通过
+- [ ] 所有 REST API 接口返回正确结果
+- [ ] 事件监听器正常工作，无重复处理
+- [ ] 数据库记录与链上状态一致
+- [ ] Kafka 消息正常生产和消费
+- [ ] Redis 去重机制有效
+- [ ] 应用日志无 ERROR 级别错误
+- [ ] 服务重启后能正确断点续传
+
+**祝测试顺利！** 🚀

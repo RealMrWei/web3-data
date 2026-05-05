@@ -3,6 +3,8 @@ package com.web3.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import com.web3.utils.Web3ContractClient;
+
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
@@ -19,15 +21,19 @@ public class AssetManagementService {
     private final WithdrawalService withdrawalService;
     private final AssetQueryService assetQueryService;
     private final EventListenerService eventListenerService;
+    private final Web3ContractClient web3ContractClient;
 
     public AssetManagementService(DepositService depositService,
-                                  WithdrawalService withdrawalService,
-                                  AssetQueryService assetQueryService,
-                                  EventListenerService eventListenerService) {
+            WithdrawalService withdrawalService,
+            AssetQueryService assetQueryService,
+            EventListenerService eventListenerService,
+            Web3ContractClient web3ContractClient) {
         this.depositService = depositService;
         this.withdrawalService = withdrawalService;
         this.assetQueryService = assetQueryService;
         this.eventListenerService = eventListenerService;
+        this.web3ContractClient = web3ContractClient;
+
     }
 
     // ==================== 充值相关 ====================
@@ -43,9 +49,9 @@ public class AssetManagementService {
     /**
      * ERC20代币充值
      */
-    public String depositERC20(String chainName, String tokenAddress, String fromAddress, 
-                              String privateKey, BigInteger amount) {
-        log.info("处理ERC20充值请求: chain={}, token={}, from={}, amount={}", 
+    public String depositERC20(String chainName, String tokenAddress, String fromAddress,
+            String privateKey, BigInteger amount) {
+        log.info("处理ERC20充值请求: chain={}, token={}, from={}, amount={}",
                 chainName, tokenAddress, fromAddress, amount);
         return depositService.depositERC20(chainName, tokenAddress, fromAddress, privateKey, amount);
     }
@@ -54,7 +60,7 @@ public class AssetManagementService {
      * 批量充值
      */
     public List<String> batchDeposit(String chainName, String fromAddress, String privateKey,
-                                    List<DepositService.DepositRequest> deposits) {
+            List<DepositService.DepositRequest> deposits) {
         log.info("处理批量充值请求: chain={}, count={}", chainName, deposits.size());
         return depositService.batchDeposit(chainName, fromAddress, privateKey, deposits);
     }
@@ -62,19 +68,11 @@ public class AssetManagementService {
     // ==================== 提现相关 ====================
 
     /**
-     * 申请原生币提现
-     */
-    public String requestNativeWithdrawal(String chainName, String userAddress, BigInteger amount) {
-        log.info("处理原生币提现申请: chain={}, user={}, amount={}", chainName, userAddress, amount);
-        return withdrawalService.requestNativeWithdrawal(chainName, userAddress, amount);
-    }
-
-    /**
      * 申请ERC20提现
      */
-    public String requestERC20Withdrawal(String chainName, String tokenAddress, 
-                                        String userAddress, BigInteger amount) {
-        log.info("处理ERC20提现申请: chain={}, token={}, user={}, amount={}", 
+    public String requestERC20Withdrawal(String chainName, String tokenAddress,
+            String userAddress, BigInteger amount) {
+        log.info("处理ERC20提现申请: chain={}, token={}, user={}, amount={}",
                 chainName, tokenAddress, userAddress, amount);
         return withdrawalService.requestERC20Withdrawal(chainName, tokenAddress, userAddress, amount);
     }
@@ -83,18 +81,17 @@ public class AssetManagementService {
      * 执行提现（管理员操作）
      */
     public String executeWithdrawal(String chainName, String recipient, String privateKey,
-                                   BigInteger amount, boolean isNative, String tokenAddress) {
+            BigInteger amount, boolean isNative, String tokenAddress) {
         log.info("执行提现: chain={}, recipient={}, amount={}", chainName, recipient, amount);
         return withdrawalService.executeWithdrawal(
-            chainName, recipient, privateKey, amount, isNative, tokenAddress
-        );
+                chainName, recipient, privateKey, amount, isNative, tokenAddress);
     }
 
     /**
      * 批量执行提现
      */
     public List<String> batchExecuteWithdrawals(String chainName, String privateKey,
-                                               List<WithdrawalService.WithdrawalRequest> withdrawals) {
+            List<WithdrawalService.WithdrawalRequest> withdrawals) {
         log.info("批量执行提现: chain={}, count={}", chainName, withdrawals.size());
         return withdrawalService.batchExecuteWithdrawals(chainName, privateKey, withdrawals);
     }
@@ -128,8 +125,8 @@ public class AssetManagementService {
     /**
      * 查询充值历史
      */
-    public List<AssetQueryService.DepositRecord> getDepositHistory(String chainName, 
-                                                                   String userAddress, int limit) {
+    public List<AssetQueryService.DepositRecord> getDepositHistory(String chainName,
+            String userAddress, int limit) {
         log.debug("查询充值历史: chain={}, user={}, limit={}", chainName, userAddress, limit);
         return assetQueryService.getDepositHistory(chainName, userAddress, limit);
     }
@@ -137,8 +134,8 @@ public class AssetManagementService {
     /**
      * 查询提现历史
      */
-    public List<AssetQueryService.WithdrawalRecord> getWithdrawalHistory(String chainName, 
-                                                                         String userAddress, int limit) {
+    public List<AssetQueryService.WithdrawalRecord> getWithdrawalHistory(String chainName,
+            String userAddress, int limit) {
         log.debug("查询提现历史: chain={}, user={}, limit={}", chainName, userAddress, limit);
         return assetQueryService.getWithdrawalHistory(chainName, userAddress, limit);
     }
@@ -148,8 +145,8 @@ public class AssetManagementService {
     /**
      * 监听充值事件
      */
-    public List<EventListenerService.DepositEvent> listenDeposits(String chainName, 
-                                                                  BigInteger fromBlock, BigInteger toBlock) {
+    public List<EventListenerService.DepositEvent> listenDeposits(String chainName,
+            BigInteger fromBlock, BigInteger toBlock) {
         log.debug("监听充值事件: chain={}, from={}, to={}", chainName, fromBlock, toBlock);
         return eventListenerService.listenDepositEvents(chainName, fromBlock, toBlock);
     }
@@ -157,8 +154,8 @@ public class AssetManagementService {
     /**
      * 监听提现事件
      */
-    public List<EventListenerService.WithdrawalEvent> listenWithdrawals(String chainName, 
-                                                                        BigInteger fromBlock, BigInteger toBlock) {
+    public List<EventListenerService.WithdrawalEvent> listenWithdrawals(String chainName,
+            BigInteger fromBlock, BigInteger toBlock) {
         log.debug("监听提现事件: chain={}, from={}, to={}", chainName, fromBlock, toBlock);
         return eventListenerService.listenWithdrawalEvents(chainName, fromBlock, toBlock);
     }
@@ -167,8 +164,15 @@ public class AssetManagementService {
      * 启动持续事件监听
      */
     public void startContinuousListening(String chainName, BigInteger lastBlock, long pollInterval) {
-        log.info("启动持续事件监听: chain={}, lastBlock={}, interval={}ms", 
+        log.info("启动持续事件监听: chain={}, lastBlock={}, interval={}ms",
                 chainName, lastBlock, pollInterval);
         eventListenerService.startContinuousListening(chainName, lastBlock, pollInterval);
+    }
+
+    public String depositWithClient(String chainName, String tokenAddress, String fromAddress, String privateKey,
+            BigInteger bigInteger) {
+        // TODO Auto-generated method stub
+
+        return null;
     }
 }

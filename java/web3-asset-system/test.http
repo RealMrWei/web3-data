@@ -197,7 +197,7 @@ Content-Type: application/json
 POST http://localhost:8080/api/test/deposit
 Content-Type: application/x-www-form-urlencoded
 
-tokenAddress=0x610178dA211FEF7D417bC0e6FeD39F05609AD788&amount=100
+tokenAddress=0xe7f1725e7734ce288f8367e1bb143e90bb3f0512&amount=1000000000000000000
 
 ###
 
@@ -205,10 +205,88 @@ tokenAddress=0x610178dA211FEF7D417bC0e6FeD39F05609AD788&amount=100
 POST http://localhost:8080/api/test/withdrawal
 Content-Type: application/x-www-form-urlencoded
 
-tokenAddress=0x610178dA211FEF7D417bC0e6FeD39F05609AD788&amount=50
+tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&amount=50
 
 ###
 
 ### ============================================
-### 6. 其他查询示例 (可选)
+### 6. ERC20 授权管理测试
+### ============================================
+
+### 查询用户授权额度 (ERC20 Allowance)
+GET http://localhost:8080/api/withdrawal/allowance?chainName=localhost&userAddress=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&withdrawContract=0x5FC8d32690cc91D4c39d9d3abcBD16989F875707
+Accept: application/json
+
+###
+
+### 模拟用户授权 (Approve)
+POST http://localhost:8080/api/withdrawal/approve
+Content-Type: application/x-www-form-urlencoded
+
+chainName=localhost&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&privateKey=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&amount=1000000000000000000
+
+###
+
+### ============================================
+### 7. 提现操作测试
+### ============================================
+
+### 执行提现 (Withdraw)
+POST http://localhost:8080/api/withdrawal/withdraw
+Content-Type: application/x-www-form-urlencoded
+
+chainName=localhost&adminPrivateKey=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&withdrawalId=0
+
+###
+
+### ============================================
+### 8. 提现申请与审批测试
+### ============================================
+
+### 用户申请提现 (Request Withdrawal)
+POST http://localhost:8080/api/withdrawal/requestWithdrawal
+Content-Type: application/x-www-form-urlencoded
+
+chainName=localhost&userAddress=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&amount=1000000000000000000
+
+###
+
+### 管理员审批提现 (Approve Withdrawal)
+POST http://localhost:8080/api/withdrawal/approveWithdrawal
+Content-Type: application/x-www-form-urlencoded
+
+chainName=localhost&adminKey=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80&withdrawalId=0
+
+###
+
+### ============================================
+### 9. 提现记录查询测试
+### ============================================
+
+### 获取下一个提现ID (Get Next Withdrawal ID)
+GET http://localhost:8080/api/withdrawal/nextWithdrawalId?chainName=localhost
+Accept: application/json
+
+###
+
+### 查询提现记录详情 (Get Withdrawal Record)
+GET http://localhost:8080/api/withdrawal/withdrawalRecord?chainName=localhost&withdrawalId=0
+Accept: application/json
+
+###
+
+### ============================================
+### 10. 直接提现测试
+### ============================================
+
+### 直接给提现合约打款 (Test Direct Withdraw)
+POST http://localhost:8080/api/test/directWithdraw
+Content-Type: application/x-www-form-urlencoded
+
+tokenAddress=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512&amount=3000000000000000000
+
+###
+
+### ============================================
+### 11. 其他查询示例 (可选)
 ### ============================================
