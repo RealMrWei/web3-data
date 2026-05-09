@@ -1,0 +1,115 @@
+# Web3 链上资产管理系统
+
+## 项目简介
+
+**Web3 链上资产管理系统** - 模拟交易所架构，支持多链资产充值、提现、事件监听的全栈解决方案。
+
+**技术栈：**
+- **智能合约**: Solidity ^0.8.20, OpenZeppelin, UUPS 代理模式
+- **后端服务**: Spring Boot 2.7.x, MyBatis-Plus, Web3j
+- **数据库**: MySQL 8.0
+- **缓存**: Redis
+- **消息队列**: Kafka
+- **分布式锁**: ShedLock + Redis
+- **多链支持**: Ethereum, BNB Chain, Arbitrum（可扩展）
+- **开发工具**: Hardhat v2.x, ethers.js v5.x
+
+---
+
+## 📋 项目进度（2025-05-13）
+
+### ✅ 已完成核心功能
+
+#### 1. **智能合约部署与联调**
+- ✅ 修复 AssetToken 代理合约初始化问题（`initialize` + `unsafeAllow.constructor`）
+- ✅ 编写并执行 `scripts/add-token-to-vault.js`，解决代币支持列表缺失问题
+- ✅ 编写并执行 `scripts/diagnose-deposit.js`，实现充值全流程自动化诊断
+- ✅ 修复 Java 配置文件地址不一致导致的 `Token not supported` 错误
+- ✅ 更新 `test.http` 中的合约地址，确保测试请求指向最新部署的合约
+
+#### 2. **后端业务逻辑验证**
+- ✅ 成功通过 Java API 调用 DepositVault 完成 100 ATK 充值
+- ✅ 验证链上余额同步：Vault 余额增加，用户钱包余额减少
+- ✅ 发现并记录多合约架构下的余额校验经验（DepositVault vs WithdrawalManager）
+
+#### 3. **提现流程完整实现**
+- ✅ 编写 `scripts/test-withdrawal.js` 脚本，理清提现前置条件
+- ✅ 确认提现需要先调用 `depositToVault` 将资金转入 WithdrawalManager 内部账本
+- ✅ 实现完整的提现申请、审批、执行流程
+- ✅ 添加授权额度查询与授权操作接口
+- ✅ 实现提现记录查询与状态跟踪功能
+
+#### 4. **业务功能补全**
+- ✅ 创建正式的业务控制器：`DepositController.java`（充值查询、申请）
+- ✅ 创建正式的业务控制器：`WithdrawalController.java`（提现申请、订单跟踪）
+- ✅ 创建资产查询接口：`AssetController.java`（实时余额、历史记录）
+- ✅ 完善全局异常处理器 `GlobalExceptionHandler.java`
+- ✅ 创建合约服务封装层：`DepositService.java`、`WithdrawalService.java`
+- ✅ 创建资产服务封装层：`AssetManagementService.java`、`AssetQueryService.java`
+- ✅ 添加测试接口：`TestTransactionController.java`（直接提现等测试功能）
+
+#### 5. **数据持久层完善**
+- ✅ 创建 MyBatis-Plus Mapper 接口（6个实体对应的Mapper）
+- ✅ 实现 MetaObjectHandler 自动填充处理器（createTime, updateTime）
+
+#### 6. **事件监听与消息处理**
+- ✅ 实现充值事件监听器：`DepositEventListener.java`
+- ✅ 实现提现事件监听器：`WithdrawalEventListener.java`
+- ✅ 实现充值事件消费者：`DepositEventConsumer.java`
+- ✅ 实现提现事件消费者：`WithdrawalEventConsumer.java`
+- ✅ 完善 Kafka 配置与批量消费机制
+
+#### 7. **分布式锁与集群支持**
+- ✅ 配置 ShedLock + Redis 分布式锁防止重复处理
+- ✅ 为事件监听器添加 `@SchedulerLock` 注解
+
+---
+
+### ⏳ 待完成/优化模块
+
+#### 1. **安全性与健壮性增强**
+- [ ] 私钥管理：从硬编码迁移至环境变量或 KMS
+- [ ] 幂等性处理：API 层防重提交（防止用户短时间内多次点击）
+- [ ] 监控告警：交易重试次数超过阈值时发送告警
+
+#### 2. **合约升级演练**
+- [ ] 编写 UserPointsV2 升级合约
+- [ ] 实现 UUPS 升级流程并验证数据保留
+
+---
+
+### 💡 遇到的挑战与解决方案（简历亮点）
+
+#### 挑战 1：代理合约初始化陷阱
+- **问题**：直接部署实现合约导致角色权限缺失，交易回滚。
+- **解决**：深入理解 OpenZeppelin Upgrades 插件机制，使用 `deployProxy` 配合 `initializer` 参数，并在构造函数中添加 `@custom:oz-upgrades-unsafe-allow` 注释。
+
+#### 挑战 2：多合约状态同步一致性
+- **问题**：充值成功后提现仍报余额不足，混淆了链上实际余额与合约内部记账。
+- **解决**：梳理资金流向，明确 DepositVault（入金池）与 WithdrawalManager（出金池）的职责边界，设计跨合约转账或内部账本同步方案。
+
+#### 挑战 3：配置驱动的地址管理
+- **问题**：Hardhat 每次重启生成新地址，导致 Java 应用频繁连接失效。
+- **解决**：建立以 `config/address.json` 为唯一权威源的配置同步机制，并编写自动化脚本实现"部署即更新"。
+
+---
+
+**项目状态：** 🟢 **核心功能全部完成**  
+**最后更新：** 2025-05-13  
+**今日进度：** 智能合约联调完成 ✅ | 充值功能闭环验证 ✅ | 提现功能完整实现 ✅ | 事件监听器完成 ✅ | API接口开发完成 ✅ | 测试用例完善 ✅
+
+---
+
+### 🎯 项目目标
+
+#### 核心功能规划
+
+| 模块 | 功能 | 状态 |
+|------|------|------|
+| **智能合约** | 积分管理、充值、提现、多签审批 | ✅ 已完成 |
+| **后端服务** | 多链交互、事件监听、资产管理 | ✅ 已完成 |
+| **事件监听** | 区块链事件同步、Kafka 异步处理 | ✅ 已完成 |
+| **REST API** | 充值查询、提现申请、资产查询 | ✅ 已完成 |
+| **分布式锁** | ShedLock + Redis 防止集群重复处理 | ✅ 已完成 |
+| **幂等性设计** | txHash 去重、乐观锁更新 | ⏳ 待开发 |
+| **安全增强** | 私钥管理、环境变量配置 | ⏳ 待开发 |
